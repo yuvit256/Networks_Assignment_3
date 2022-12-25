@@ -1,4 +1,4 @@
-//SERVER
+///SERVER
 
 #include <stdio.h> 
 #include <stdlib.h> 
