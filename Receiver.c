@@ -20,13 +20,17 @@ int main()
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if(sock <= 0)
     {
-        return 0;
+        perror("socket creation failed");
+        close(sock);
+        exit(1);
     }
 
     int enableReuse = 1; 
     if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
     {
-        return 0;
+        perror("socket setting failed");
+        close(sock);
+        exit(1);
     }
     
     struct sockaddr_in server_address;
@@ -37,12 +41,16 @@ int main()
     
     if(bind(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < -1)
     {
-        return 0;
+        perror("binding failed");
+        close(sock);
+        exit(1);
     }
 
     if(listen(sock, 1) < 0)
     {
-        return 0;
+        perror("listening failed");
+        close(sock);
+        exit(1);
     }
 
     printf("Waiting for incoming TCP-connection...\n");
