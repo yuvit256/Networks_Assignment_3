@@ -17,19 +17,19 @@
 
 int main()
 {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock <= 0)
+    int listeningSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if(listeningSocket <= 0)
     {
         perror("socket creation failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
     int enableReuse = 1; 
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
+    if(setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
     {
         perror("socket setting failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
     
@@ -39,17 +39,17 @@ int main()
     server_address.sin_port = htons(PORT);
     server_address.sin_addr.s_addr = INADDR_ANY;
     
-    if(bind(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < -1)
+    if(bind(listeningSocket, (struct sockaddr *)&server_address, sizeof(server_address)) < -1)
     {
         perror("binding failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
-    if(listen(sock, 1) < 0)
+    if(listen(listeningSocket, 1) < 0)
     {
         perror("listening failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
@@ -60,24 +60,89 @@ int main()
 
     memset(&clientAddress, 0, sizeof(clientAddress)); 
     clientAddressLen = sizeof(clientAddress); 
-
-    int sock2 = accept(sock, (struct sockaddr *)&clientAddress, &clientAddressLen);
-    if(sock2 <= 0)
+    int clientSocket = accept(listeningSocket, (struct sockaddr *)&clientAddress, &clientAddressLen);
+    if(clientSocket <= 0)
     {
-        return -1;
+        perror("client socket acception failed.");
+        close(listeningSocket);
+        exit(1);
     }
 
     printf("A new client connection accepted\n");
 
-    char buffer[BUFSIZ];
-    memset(buffer, '\0', BUFSIZ);
 
-    if(recv(sock2, buffer, BUFSIZ, 0) <= 0)
-    {
-        printf("err");
-        return 0;
+    while (1) {
+        memset(&clientAddress, 0, sizeof(clientAddress));
+        clientAddressLen = sizeof(clientAddress);
+        int clientSocket = accept(listeningSocket, (struct sockaddr *)&clientAddress, &clientAddressLen);
+        if (clientSocket == -1) {
+            printf("listen failed with error code : %d", errno);
+            // close the sockets
+            close(listeningSocket);
+            return -1;
+        }
+
+        printf("A new client connection accepted\n");
+
+        // Receive a message from client
+        char buffer[BUFSIZ];
+        memset(buffer, 0, BUFSIZ);
+        int bytesReceived = recv(clientSocket, buffer, BUFSIZ, 0);
+        if (bytesReceived == -1) {
+            printf("recv failed with error code : %d", errno);
+            // close the sockets
+            close(listeningSocket);
+            close(clientSocket);
+            return -1;
+        }
+        
+        //receiving the file from the Sender/Client.
+        int receivedFile;
+        recv(clientSocket,&receivedFile, sizeof(receivedFile), 0);
+        if(receivedFile==0){
+            printf("The proccess of sending the file ended. \n");
+            break;
+        }
+
+        
+        printf("Received: %s", buffer);
+
+        // Reply to client
+        char *message = "Welcome to our TCP-server\n";
+        int messageLen = strlen(message) + 1;
+
+        int bytesSent = send(clientSocket, message, messageLen, 0);
+        if (bytesSent == -1) {
+            printf("send() failed with error code : %d", errno);
+            close(listeningSocket);
+            close(clientSocket);
+            return -1;
+        } else if (bytesSent == 0) {
+            printf("peer has closed the TCP connection prior to send().\n");
+        } else if (bytesSent < messageLen) {
+            printf("sent only %d bytes from the required %d.\n", messageLen, bytesSent);
+        } else {
+            printf("message was successfully sent.\n");
+        }
     }
-    printf("message: %s", buffer);
+
+    close(listeningSocket);
 
     return 0;
+
+
+
+
+
+    // char buffer[BUFSIZ];
+    // memset(buffer, '\0', BUFSIZ);
+
+    // if(recv(sock2, buffer, BUFSIZ, 0) <= 0)
+    // {
+    //     printf("err");
+    //     return 0;
+    // }
+    // printf("message: %s", buffer);
+
+    // return 0;
 }
