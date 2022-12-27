@@ -1,13 +1,12 @@
-
 //Authors: Yuval Musseri & Maor Berenstein:
 
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <stdio.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <errno.h> 
+#include <errno.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -15,11 +14,12 @@
 
 #define PORT 9696
 #define IP "127.0.0.1"
-#define BUFSIZ 8192
+#define FILE_SIZE 1356519
+#define YxM "0000100000101010"
 
 //Function that send the file to the receiver:
 
-int sendall(int socket, char * buf, int *len){
+long sendall(int socket, char * buf, long *len){
     int total = 0;        // how many bytes we've sent
     int bytesleft = *len; // how many we have left to send
     int n;
@@ -39,145 +39,123 @@ int sendall(int socket, char * buf, int *len){
 int main()
 {
 
-// Reading the file:
+//Level 1 - Reading the file:
 
-    FILE *file = fopen("bible.txt", "r"); // Opening the file
-    if(file == NULL) // Checking if the file opened proparlly
+    char authentication[BUFSIZ] = {'\0'};
+
+    FILE *fp = fopen("bible.txt", "r"); // reading the file with the flag "r"
+    if (fp == NULL) // cheacking if the file opened correctly
     {
-        printf("Couldn't open the file correctly\n");
-        return -1;
+        printf("cannot open file, error number: %d\n", errno);
+        exit(1);
     }
-    printf("File opened succefully\n");
+    printf("file opened succefully\n");
 
-// Calculating the length of the file:
+    fseek(fp, SEEK_SET, SEEK_END); // seeking the start of the file
+    long fileSize = ftell(fp); // the length of the file
+    rewind(fp); // returns the pointer of the file to the begining fo the file
 
-    fseek(file, SEEK_SET, SEEK_END);
-    int size = ftell(file);
-    rewind(file);
-    int halfFile = size/2;
+    long p1 = fileSize/2; // First part length
+    long *pp1 = &p1;
+    char fp1[p1];
+    fread(fp1, 1, p1+1, fp); // inserting the first half into the array
+    long p2 = fileSize - p1; // second part length
+    long *pp2 = &p2;
+    char fp2[p2];
+    fread(fp2, 1, p2+1, fp);// inserting the second half into the array
 
-// Creating the socket:
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0); 
-    if(sock == -1) // Checking if the socket opened proparlly
-    {
-        printf("Couldn't create the socket correctly\n");
-        close(sock);
-        return -1;
-    }
-    printf("Socket created succefully\n");
-
-// Creating a TCP Connection between the sender and receiver:
+    fclose(fp); // closing the file
     
-    struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address)); // reset  
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
-    server_address.sin_addr.s_addr = INADDR_ANY;
+//Level 2 - Creating a TCP Connection between the sender and receiver:
 
-    if(connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) // Checking if the connection opened proparlly
+    int sock = socket(AF_INET, SOCK_STREAM, 0); //creating the socket
+    if (sock == -1) // Checking if the socket opened proparlly
     {
-        printf("Couldn't create the connection correctly\n");
+        printf("Couldn't create the socket correctly, error number: %d\n", errno);
         close(sock);
         exit(1);
-        return -1;
+    }
+    printf("Socket created succefully\n");
+    
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address)); // reset
+    server_address.sin_family = AF_INET; // IPv4
+    server_address.sin_port = htons(PORT); //translates an integer from host byte order to network byte order
+    server_address.sin_addr.s_addr = INADDR_ANY; //here we set the received ip address to be any ip we get
+
+    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) // cheaking if we connected proparlly
+    {
+        printf("Couldn't create the connection correctly, error number: %d\n", errno);
+        close(sock);
+        exit(1);
     }
     printf("The connection Succeeded!\n");
 
-//Sending the first part of the file:
+//Level 3 - Sending the first part of the file:
 
 Sending:
 
-    char *fp1 = (char*)malloc((halfFile+1)*sizeof(char)); // Creating a memory in the heap
-    char *fp2 = (char*)malloc((size-halfFile+1)*sizeof(char)); // Creating a memory in the heap
-    memset(fp1, EOF, (halfFile+1)*sizeof(char)); // reset
-    memset(fp1, EOF, (size-halfFile+1)*sizeof(char)); // reset
-    
-    fread(fp1, 1, halfFile+1, file); // Reads data from the given stream
-    fread(fp2, 1, size-halfFile+1, file); // Reads data from the given stream
+    char *algo = "cubic";
+    setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+    printf("Changed CC algorithm to cubic\n");    
 
-// Sending the first half of the file:
-
-    int p1 = halfFile+1; // First part length
-    int *p11 = &p1; // argument for the function sendall()
-    if(setsockopt(sock,IPPROTO_TCP,TCP_CONGESTION,"cubic",5)<0){  // Sending the file with "cubic" cc algorithm 
-        close(sock);
-        exit(1);
-        return -1; 
-    }  
-    if(sendall(sock, fp1, p11) == -1){
+    if(sendall(sock, fp1, pp1) == -1){
         printf("Error in sending the file\n");
         close(sock);
         exit(1);
         return -1;
     }
-    printf("First part of the file send successfuly and sent %d bytes\n", *p11);
-    free(fp1); // We used the heap therefor we need to free the memory
+    printf("First part of the file send successfuly and sent %ld bytes\n", *pp1);
 
-// Authentication:
+//Level 4 - Checking for authentication
 
-    int YUVAL_ID = 8039;
-    int MAOR_ID = 5965;
-    int YxM = YUVAL_ID^MAOR_ID;
-    printf("Waiting for authentication...\n");
-    int authenticationReply; 
-    int byteRecieved  = recv(sock, &authenticationReply, 12, 0); // Recv the authentication 
-    if(byteRecieved == -1){
-        printf("recv() failed"); 
+    recv(sock, authentication, BUFSIZ, 0);
+    if(strcmp(authentication, "-1") == 0){
+        printf("Error in function recv()\n");
         close(sock);
-        exit(1);
-        return -1; 
-    }     
-    printf("recieved %d bytes from server :\n", byteRecieved);    
-    if(authenticationReply != YxM){ 
-        printf("authentication faild\n");
-        close(sock);
-        exit(1);
-        return -1; 
+        close(1);
     }
-    printf("Authentication succeeded\n");
 
-//Sending the second part of the file:
-
-    if(setsockopt(sock,IPPROTO_TCP,TCP_CONGESTION,"reno",sizeof("reno"))<0){ // Sending the file with "cubic" cc algorithm
-        close(sock);
-        exit(1);
-        return -1; 
-    }
-    int p2 = size-halfFile+1; // Second part length
-    int *p22 = &p2; // argument for the function sendall()
-    if(sendall(sock, fp2, p22) == -1){ //Cheaking if the data sent proparlly
-        printf("Error in sending the file\n");
-        close(sock);
-        exit(1);
-        return -1;
-    }
-    printf("Second part of the file send successfuly and sent %d bytes\n", *p22);
-    free(fp2); // We used the heap therefor we need to free the memory
-    if(fclose(file) != EOF) // Cheaking if its the end of the file
+    if(strcmp(authentication, YxM) != 0) //cheaking if the receiver sent us the authentication correctly
     {
-        printf("Couldn't close the file correctly\n");
+        printf("not match!!!!!\n");
+        close(sock);
+        close(1);
+
+    }
+    printf("message: %s \n", authentication);
+
+//Level 5 - Changing the CC Algorithm:
+
+    algo = "reno";
+    setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+    printf("Changed CC algorithm to reno\n");
+
+//Level 6 - Sending the second part:
+
+    if(sendall(sock, fp2, pp2) == -1){
+        printf("Error in sending the file\n");
         close(sock);
         exit(1);
         return -1;
     }
-    printf("File closed succefully\n");
+    printf("Second part of the file send successfuly and sent %ld bytes\n", *pp2);
 
-//User decision:
-
-TryAgain:
-
-    char q;
-    printf("Do you want to send the file againg? \n Type Y for yes and N for no \n");
-    scanf("%c", &q);
-    printf("\n");
-    if(q == 'Y'){ // Cheacking the user decision
-        goto Sending;
-    }else if(q == 'N'){
-        goto exit;
-    }else{
-        printf("Wrong input please try again\n");
-        goto TryAgain;
+//Level 7 - User decision:
+ 
+    while(1){
+        printf("Do you want to send the file againg? \n Type Y for yes and N for exit \n");
+tryAgain:
+        char decision ='0';
+        scanf("%c", &decision);
+        if(decision == 'N'){
+            send(sock, &decision, strlen(&decision) + 1, 0);
+            goto exit;
+        }
+        else if(decision == 'Y'){
+            send(sock, &decision, strlen(&decision) + 1, 0);
+            goto Sending;
+        }else{goto tryAgain;}
     }
 
 exit:

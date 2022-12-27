@@ -1,83 +1,162 @@
-//SERVER
+// Authors: Yuval Musseri & Maor Berenstein:
 
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <stdio.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <errno.h> 
+#include <errno.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/tcp.h>
+#include <stdbool.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/times.h>
 
 #define PORT 9696
 #define IP "127.0.0.1"
+#define FILE_SIZE 1356519
+#define YxM "0000100000101010"
 
 int main()
 {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock <= 0)
+
+    struct timeval before = {0}, after = {0}, difference = {0};
+
+    int listeningSocket = socket(AF_INET, SOCK_STREAM, 0); // creating the listening socket to establish a connection
+    if (listeningSocket <= 0)                              // Checking if the socket opened proparlly
     {
         perror("socket creation failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
-    int enableReuse = 1; 
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
+    int enableReuse = 1;
+    if (setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0) //
     {
         perror("socket setting failed");
-        close(sock);
-        exit(1);
-    }
-    
-    struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address)); 
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
-    server_address.sin_addr.s_addr = INADDR_ANY;
-    
-    if(bind(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < -1)
-    {
-        perror("binding failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
-    if(listen(sock, 1) < 0)
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address)); // reset
+    server_address.sin_family = AF_INET;                // IPv4
+    server_address.sin_port = htons(PORT);              // translates an integer from host byte order to network byte order
+    server_address.sin_addr.s_addr = INADDR_ANY;        //
+
+    if (bind(listeningSocket, (struct sockaddr *)&server_address, sizeof(server_address)) < -1) // לא יודע מה זה
+    {
+        perror("binding failed");
+        close(listeningSocket);
+        exit(1);
+    }
+
+    if (listen(listeningSocket, 1) < 0) // לא יודע מה זה
     {
         perror("listening failed");
-        close(sock);
+        close(listeningSocket);
         exit(1);
     }
 
     printf("Waiting for incoming TCP-connection...\n");
 
-    struct sockaddr_in clientAddress; 
-    socklen_t clientAddressLen = sizeof(clientAddress); 
+    struct sockaddr_in clientAddress;
+    socklen_t clientAddressLen = sizeof(clientAddress);
+    memset(&clientAddress, 0, sizeof(clientAddress)); // reset
+    clientAddressLen = sizeof(clientAddress);
 
-    memset(&clientAddress, 0, sizeof(clientAddress)); 
-    clientAddressLen = sizeof(clientAddress); 
-
-    int sock2 = accept(sock, (struct sockaddr *)&clientAddress, &clientAddressLen);
-    if(sock2 <= 0)
+    int clientSocket = accept(listeningSocket, (struct sockaddr *)&clientAddress, &clientAddressLen); // Await a connection on socket, When a connection arrives, open a new socket to communicate with it
+    if (clientSocket <= 0)                                                                            // checks if the connection has done proparlly
     {
-        return -1;
+        perror("client socket acception failed.");
+        close(listeningSocket);
+        exit(1);
     }
 
     printf("A new client connection accepted\n");
 
-    char buffer[BUFSIZ];
-    memset(buffer, '\0', BUFSIZ);
+    char a = '0'; // answer from the user if to continue
+    char *answer = &a;
 
-    if(recv(sock2, buffer, BUFSIZ, 0) <= 0)
+    double sumFirstHalfTime=0, sumSecondHalfTime; 
+    int counter=0;
+Continue:
+
+    while (true)
     {
-        printf("err");
-        return 0;
-    }
-    printf("message: %s", buffer);
+        char buffer[BUFSIZ] = {'\0'};
+        long bytes = 0;
 
-    return 0;
+        gettimeofday(&before, NULL);
+
+        while (bytes != 678259) // receive first part
+        {
+            bytes += recv(clientSocket, buffer, BUFSIZ, 0);
+        }
+
+        gettimeofday(&after, NULL);
+
+        timersub(&after, &before, &difference);
+
+        double realTime1 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it tooks
+
+        printf("times: %f\n", realTime1); // output the time
+
+        char *sendSender = YxM;
+        send(clientSocket, sendSender, strlen(sendSender) + 1, 0); // send authentication
+
+        char *algo = "reno";
+        setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+        printf("congestion changed!\n");
+
+        bzero(buffer, BUFSIZ);
+        bytes = 0;
+        gettimeofday(&before, NULL);
+        while (bytes != 678260) // receive second part
+        {
+            bytes += recv(clientSocket, buffer, BUFSIZ, 0);
+        }
+
+
+        gettimeofday(&after, NULL);
+
+        timersub(&after, &before, &difference);
+
+        double realTime2 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0;
+        printf("times: %f\n", realTime2); // output the time
+
+        
+
+        recv(clientSocket, answer, 3, 0);
+        printf("Answer = %c \n", a);
+
+
+        // Calculate the time sum and then we do the avg
+
+        counter++;
+        sumFirstHalfTime += realTime1;
+        sumSecondHalfTime += realTime2;
+
+        if (a == 'Y')
+        {
+            goto Continue;
+        }
+        else if(a == 'N')
+        {
+            printf("Time it took to send the first half:%lf \n",realTime1);
+            printf("Time it took to send the second half:%lf \n",realTime2);
+            printf("The avg time it took to send the first half:%lf \n",sumFirstHalfTime/counter);
+            printf("The avg time it took to send the second half:%lf \n",sumSecondHalfTime/counter);
+            
+            break;
+        }
+    }
+
+    close(listeningSocket);
+    close(clientSocket);
+    exit(0);
 }
