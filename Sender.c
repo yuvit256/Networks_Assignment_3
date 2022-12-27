@@ -65,6 +65,8 @@ int main()
     fread(fp2, 1, p2+1, fp);// inserting the second half into the array
 
     fclose(fp); // closing the file
+    
+//Level 2 - Creating a TCP Connection between the sender and receiver:
 
     int sock = socket(AF_INET, SOCK_STREAM, 0); //creating the socket
     if (sock == -1) // Checking if the socket opened proparlly
@@ -74,9 +76,6 @@ int main()
         exit(1);
     }
     printf("Socket created succefully\n");
-
-    
-//Level 2 - Creating a TCP Connection between the sender and receiver:
     
     struct sockaddr_in server_address;
     memset(&server_address, 0, sizeof(server_address)); // reset
@@ -95,6 +94,10 @@ int main()
 //Level 3 - Sending the first part of the file:
 
 Sending:
+
+    char *algo = "cubic";
+    setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+    printf("Changed CC algorithm to cubic\n");    
 
     if(sendall(sock, fp1, pp1) == -1){
         printf("Error in sending the file\n");
@@ -124,7 +127,7 @@ Sending:
 
 //Level 5 - Changing the CC Algorithm:
 
-    char *algo = "reno";
+    algo = "reno";
     setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
     printf("Changed CC algorithm to reno\n");
 
