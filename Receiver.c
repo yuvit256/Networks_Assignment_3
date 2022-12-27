@@ -24,7 +24,7 @@
 int main()
 {
 
-    struct timeval before = {0}, after = {0}, difference = {0};
+    struct timeval before = {0}, after = {0}, difference = {0}; // here we define the vars who will hold time.
 
     int listeningSocket = socket(AF_INET, SOCK_STREAM, 0); // creating the listening socket to establish a connection
     if (listeningSocket <= 0)                              // Checking if the socket opened proparlly
@@ -100,7 +100,7 @@ Continue:
 
         gettimeofday(&after, NULL);
 
-        timersub(&after, &before, &difference);
+        timersub(&after, &before, &difference); // this function calcs the difference between after and before and sets it at difference var.
 
         double realTime1 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it took in miliseconds
 
