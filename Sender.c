@@ -109,8 +109,8 @@ Sending:
 
 //Level 4 - Checking for authentication
 
-    recv(sock, authentication, BUFSIZ, 0);
-    if(strcmp(authentication, "-1") == 0){
+    
+    if(recv(sock, authentication, BUFSIZ, 0) == -1){
         printf("Error in function recv()\n");
         close(sock);
         close(1);
@@ -128,7 +128,11 @@ Sending:
 //Level 5 - Changing the CC Algorithm:
 
     algo = "reno";
-    setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+    if(setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo))<0){
+        printf("Error in sending the file\n");
+        close(sock);
+        exit(1);
+    } // change CC
     printf("Changed CC algorithm to reno\n");
 
 //Level 6 - Sending the second part:
@@ -137,7 +141,6 @@ Sending:
         printf("Error in sending the file\n");
         close(sock);
         exit(1);
-        return -1;
     }
     printf("Second part of the file send successfuly and sent %ld bytes\n", *pp2);
 
@@ -149,11 +152,21 @@ tryAgain:
         char decision ='0';
         scanf("%c", &decision);
         if(decision == 'N'){
-            send(sock, &decision, strlen(&decision) + 1, 0);
+            if(send(sock, &decision, strlen(&decision) + 1, 0)==-1)
+            {
+                printf("Error in sending the N for exit command\n");
+                close(sock);
+                exit(1);
+            };
             goto exit;
         }
         else if(decision == 'Y'){
-            send(sock, &decision, strlen(&decision) + 1, 0);
+            if(send(sock, &decision, strlen(&decision) + 1, 0)==-1)
+            {
+                printf("Error in sending the Y command to send another file\n");
+                close(sock);
+                exit(1);
+            };
             goto Sending;
         }else{goto tryAgain;}
     }

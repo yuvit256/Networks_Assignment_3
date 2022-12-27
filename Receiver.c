@@ -82,8 +82,8 @@ int main()
     char a = '0'; // answer from the user if to continue
     char *answer = &a;
 
-    double sumFirstHalfTime=0, sumSecondHalfTime; 
-    int counter=0;
+    double sumFirstHalfTime = 0, sumSecondHalfTime;
+    int counter = 0;
 Continue:
 
     while (true)
@@ -107,10 +107,21 @@ Continue:
         printf("times: %f\n", realTime1); // output the time
 
         char *sendSender = YxM;
-        send(clientSocket, sendSender, strlen(sendSender) + 1, 0); // send authentication
+        if (send(clientSocket, sendSender, strlen(sendSender) + 1, 0) == -1)
+        {
+            printf("Error in sending the N for exit command\n");
+            close(clientSocket);
+            close(listeningSocket);
+            exit(1);
+        }; // send authentication
 
         char *algo = "reno";
-        setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo)); // change CC
+        if(setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo))<0){
+            printf("Error in changinc CC algorithem to reno\n");
+            close(clientSocket);
+            close(listeningSocket);
+            exit(1);
+        }; // change CC
         printf("congestion changed!\n");
 
         bzero(buffer, BUFSIZ);
@@ -121,7 +132,6 @@ Continue:
             bytes += recv(clientSocket, buffer, BUFSIZ, 0);
         }
 
-
         gettimeofday(&after, NULL);
 
         timersub(&after, &before, &difference);
@@ -129,11 +139,8 @@ Continue:
         double realTime2 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0;
         printf("times: %f\n", realTime2); // output the time
 
-        
-
         recv(clientSocket, answer, 3, 0);
         printf("Answer = %c \n", a);
-
 
         // Calculate the time sum and then we do the avg
 
@@ -145,13 +152,13 @@ Continue:
         {
             goto Continue;
         }
-        else if(a == 'N')
+        else if (a == 'N')
         {
-            printf("Time it took to send the first half:%lf \n",realTime1);
-            printf("Time it took to send the second half:%lf \n",realTime2);
-            printf("The avg time it took to send the first half:%lf \n",sumFirstHalfTime/counter);
-            printf("The avg time it took to send the second half:%lf \n",sumSecondHalfTime/counter);
-            
+            printf("Time it took to send the first half:%lf \n", realTime1);
+            printf("Time it took to send the second half:%lf \n", realTime2);
+            printf("The avg time it took to send the first half:%lf \n", sumFirstHalfTime / counter);
+            printf("The avg time it took to send the second half:%lf \n", sumSecondHalfTime / counter);
+
             break;
         }
     }
