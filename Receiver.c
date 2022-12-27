@@ -35,36 +35,36 @@ int main()
     }
 
     int enableReuse = 1;
-    if (setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0) //
+    if (setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0) // 
     {
         perror("socket setting failed");
         close(listeningSocket);
         exit(1);
     }
 
-    struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address)); // reset
-    server_address.sin_family = AF_INET;                // IPv4
-    server_address.sin_port = htons(PORT);              // translates an integer from host byte order to network byte order
-    server_address.sin_addr.s_addr = INADDR_ANY;        //
+    struct sockaddr_in serverAddress;
+    memset(&serverAddress, 0, sizeof(serverAddress)); // reset
+    serverAddress.sin_family = AF_INET;                // IPv4
+    serverAddress.sin_port = htons(PORT);              // translates an integer from host byte order to network byte order
+    serverAddress.sin_addr.s_addr = INADDR_ANY;        // recives any IP as an address which can communicate with it.
 
-    if (bind(listeningSocket, (struct sockaddr *)&server_address, sizeof(server_address)) < -1) // לא יודע מה זה
+    if (bind(listeningSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < -1) // we bind the socket with the settings we set above.
     {
         perror("binding failed");
         close(listeningSocket);
         exit(1);
     }
 
-    if (listen(listeningSocket, 1) < 0) // לא יודע מה זה
+    if (listen(listeningSocket, 1) < 0) // here we "listen" and wait for a client to connect and by that start the communication.
     {
         perror("listening failed");
         close(listeningSocket);
         exit(1);
     }
 
-    printf("Waiting for incoming TCP-connection...\n");
+    printf("Waiting for incoming TCP-connection...\n"); // we wait for the client to send a connection request.
 
-    struct sockaddr_in clientAddress;
+    struct sockaddr_in clientAddress; // we set our preferences for the client socket
     socklen_t clientAddressLen = sizeof(clientAddress);
     memset(&clientAddress, 0, sizeof(clientAddress)); // reset
     clientAddressLen = sizeof(clientAddress);
@@ -82,8 +82,8 @@ int main()
     char a = '0'; // answer from the user if to continue
     char *answer = &a;
 
-    double sumFirstHalfTime = 0, sumSecondHalfTime;
-    int counter = 0;
+    double sumFirstHalfTime = 0, sumSecondHalfTime= 0; // here we define the variable who hold all the running time for all the files.
+    int counter = 0; // here we define the counter which counts the times the sender sent the file.
 Continue:
 
     while (true)
@@ -102,14 +102,15 @@ Continue:
 
         timersub(&after, &before, &difference);
 
-        double realTime1 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it tooks
+        double realTime1 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it took in miliseconds
 
         printf("times: %f\n", realTime1); // output the time
 
-        char *sendSender = YxM;
-        if (send(clientSocket, sendSender, strlen(sendSender) + 1, 0) == -1)
+        char *authKey = YxM; // in this String var we store the AUTH Key
+        if (send(clientSocket, authKey, strlen(authKey) + 1, 0) == -1) // check if the send function works properly if it does, send the auth key which contains 
+                                                                        // Maor's xor Yuval's IDs in binary to the client.
         {
-            printf("Error in sending the N for exit command\n");
+            printf("Error in sending the N for exit command\n");// if send returns -1 print error and close communication.
             close(clientSocket);
             close(listeningSocket);
             exit(1);
@@ -130,6 +131,15 @@ Continue:
         while (bytes != 678260) // receive second part
         {
             bytes += recv(clientSocket, buffer, BUFSIZ, 0);
+        }
+
+
+        *algo = "cubic";
+        if(setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, &algo, sizeof(algo))<0){
+            printf("Error in changinc CC algorithem to reno\n");
+            close(clientSocket);
+            close(listeningSocket);
+            exit(1);
         }
 
         gettimeofday(&after, NULL);
