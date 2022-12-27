@@ -1,12 +1,12 @@
-//Authors: Yuval Musseri & Maor Berenstein:
+// Authors: Yuval Musseri & Maor Berenstein:
 
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <stdio.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <errno.h> 
+#include <errno.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -27,7 +27,7 @@ int main()
     struct timeval before = {0}, after = {0}, difference = {0};
 
     int listeningSocket = socket(AF_INET, SOCK_STREAM, 0); // creating the listening socket to establish a connection
-    if (listeningSocket <= 0) // Checking if the socket opened proparlly
+    if (listeningSocket <= 0)                              // Checking if the socket opened proparlly
     {
         perror("socket creation failed");
         close(listeningSocket);
@@ -35,7 +35,7 @@ int main()
     }
 
     int enableReuse = 1;
-    if (setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0) // 
+    if (setsockopt(listeningSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0) //
     {
         perror("socket setting failed");
         close(listeningSocket);
@@ -43,10 +43,10 @@ int main()
     }
 
     struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address)); //reset
-    server_address.sin_family = AF_INET; // IPv4
-    server_address.sin_port = htons(PORT); //translates an integer from host byte order to network byte order
-    server_address.sin_addr.s_addr = INADDR_ANY; //
+    memset(&server_address, 0, sizeof(server_address)); // reset
+    server_address.sin_family = AF_INET;                // IPv4
+    server_address.sin_port = htons(PORT);              // translates an integer from host byte order to network byte order
+    server_address.sin_addr.s_addr = INADDR_ANY;        //
 
     if (bind(listeningSocket, (struct sockaddr *)&server_address, sizeof(server_address)) < -1) // לא יודע מה זה
     {
@@ -68,9 +68,9 @@ int main()
     socklen_t clientAddressLen = sizeof(clientAddress);
     memset(&clientAddress, 0, sizeof(clientAddress)); // reset
     clientAddressLen = sizeof(clientAddress);
-    
+
     int clientSocket = accept(listeningSocket, (struct sockaddr *)&clientAddress, &clientAddressLen); // Await a connection on socket, When a connection arrives, open a new socket to communicate with it
-    if (clientSocket <= 0) // checks if the connection has done proparlly
+    if (clientSocket <= 0)                                                                            // checks if the connection has done proparlly
     {
         perror("client socket acception failed.");
         close(listeningSocket);
@@ -82,9 +82,11 @@ int main()
     char a = '0'; // answer from the user if to continue
     char *answer = &a;
 
+    double sumFirstHalfTime=0, sumSecondHalfTime; 
+    int counter=0;
 Continue:
 
-    while(true)
+    while (true)
     {
         char buffer[BUFSIZ] = {'\0'};
         long bytes = 0;
@@ -100,9 +102,9 @@ Continue:
 
         timersub(&after, &before, &difference);
 
-        double realTime = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it tooks
+        double realTime1 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0; // calculating the time it tooks
 
-        printf("times: %f\n", realTime); // output the time
+        printf("times: %f\n", realTime1); // output the time
 
         char *sendSender = YxM;
         send(clientSocket, sendSender, strlen(sendSender) + 1, 0); // send authentication
@@ -119,16 +121,40 @@ Continue:
             bytes += recv(clientSocket, buffer, BUFSIZ, 0);
         }
 
+
         gettimeofday(&after, NULL);
 
-        realTime = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0;
-        printf("times: %f\n", realTime); // output the time
+        timersub(&after, &before, &difference);
+
+        double realTime2 = ((difference.tv_sec) * 1000000.0 + difference.tv_usec) / 1000.0;
+        printf("times: %f\n", realTime2); // output the time
+
+        
 
         recv(clientSocket, answer, 3, 0);
         printf("Answer = %c \n", a);
-        if(a == 'Y'){goto Continue;}
-        else{break;}
-    }       
+
+
+        // Calculate the time sum and then we do the avg
+
+        counter++;
+        sumFirstHalfTime += realTime1;
+        sumSecondHalfTime += realTime2;
+
+        if (a == 'Y')
+        {
+            goto Continue;
+        }
+        else if(a == 'N')
+        {
+            printf("Time it took to send the first half:%lf \n",realTime1);
+            printf("Time it took to send the second half:%lf \n",realTime2);
+            printf("The avg time it took to send the first half:%lf \n",sumFirstHalfTime/counter);
+            printf("The avg time it took to send the second half:%lf \n",sumSecondHalfTime/counter);
+            
+            break;
+        }
+    }
 
     close(listeningSocket);
     close(clientSocket);
